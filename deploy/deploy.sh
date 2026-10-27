@@ -31,7 +31,8 @@ gcloud config set project "$PROJECT" >/dev/null
 # Image, built remotely by Cloud Build (no local Docker needed)
 gcloud artifacts repositories describe "$REPO" --location="$REGION" >/dev/null 2>&1 \
     || gcloud artifacts repositories create "$REPO" --repository-format=docker --location="$REGION"
-gcloud builds submit --tag "$IMAGE" .
+# --suppress-logs: the granted roles cannot read the Cloud Build log bucket, so streaming fails a good build
+gcloud builds submit --tag "$IMAGE" --suppress-logs .
 
 # Env vars go through a private temp file so the token never appears on a command line
 ENV_FILE="$(mktemp)"
