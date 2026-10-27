@@ -31,8 +31,18 @@ gcloud config set project "$PROJECT" >/dev/null
 # Image, built remotely by Cloud Build (no local Docker needed)
 gcloud artifacts repositories describe "$REPO" --location="$REGION" >/dev/null 2>&1 \
     || gcloud artifacts repositories create "$REPO" --repository-format=docker --location="$REGION"
-# --suppress-logs: the granted roles cannot read the Cloud Build log bucket, so streaming fails a good build
-gcloud builds submit --tag "$IMAGE" --suppress-logs .
+# The granted roles cannot read the Cloud Build log bucket, and gcloud fails a good build when it tries to
+# follow it (even with --suppress-logs), so submit async and wait on the build status instead
+BUILD_ID="$(gcloud builds submit --tag "$IMAGE" --async --format='value(id)' .)"
+echo "Build ${BUILD_ID} started"
+while true; do
+    STATUS="$(gcloud builds describe "$BUILD_ID" --format='value(status)')"
+    case "$STATUS" in
+        SUCCESS) echo "Build ${BUILD_ID}: SUCCESS"; break ;;
+        QUEUED|WORKING|PENDING) sleep 10 ;;
+        *) echo "Build ${BUILD_ID} ended with status ${STATUS}" >&2; exit 1 ;;
+    esac
+done
 
 # Env vars go through a private temp file so the token never appears on a command line
 ENV_FILE="$(mktemp)"
