@@ -5,6 +5,7 @@ from airflow.decorators import dag, task
 
 from pipeline.config import Settings
 from pipeline.runner import run_source
+from pipeline.transform import run_models, run_tests
 
 
 @dag(
@@ -20,9 +21,17 @@ def a365_daily():
     def extract(source: str, run_id: str) -> dict:
         return run_source(Settings.from_env(), source, run_id)
 
+    @task
+    def transform() -> None:
+        run_models(Settings.from_env())
+
+    @task
+    def data_tests() -> None:
+        run_tests(Settings.from_env())
+
     run_id = "{{ ts_nodash }}"
-    for source in ("catalogos", "siniestros", "polizas"):
-        extract.override(task_id=f"extract_{source}")(source, run_id)
+    extracts = [extract.override(task_id=f"extract_{s}")(s, run_id) for s in ("catalogos", "siniestros", "polizas")]
+    extracts >> transform() >> data_tests()
 
 
 a365_daily()
