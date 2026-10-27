@@ -15,7 +15,12 @@ TIME_ZONE="America/Argentina/Buenos_Aires"
 SECRET="a365-api-token"
 SA_NAME="a365-pipeline"
 SA="${SA_NAME}@${PROJECT}.iam.gserviceaccount.com"
-IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/${JOB}:$(git rev-parse --short HEAD)"
+# The tag names the commit; uncommitted changes to anything built into the image are marked, never hidden
+TAG="$(git rev-parse --short HEAD)"
+if [ -n "$(git status --porcelain -- main.py dags requirements.txt Dockerfile)" ]; then
+    TAG="${TAG}-dirty-$(date -u +%Y%m%dT%H%M%S)"
+fi
+IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/${JOB}:${TAG}"
 
 gcloud config set project "$PROJECT" >/dev/null
 gcloud services enable secretmanager.googleapis.com run.googleapis.com cloudscheduler.googleapis.com \
