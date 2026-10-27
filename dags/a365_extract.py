@@ -1,4 +1,5 @@
 """Pulls the three API sources into raw.*, then triggers a365_transform. Same code the Cloud Run Job runs."""
+import os
 from datetime import timedelta
 
 import pendulum
@@ -10,6 +11,11 @@ from modules.config import Settings
 from modules.runner import SOURCES, run_source
 
 
+# Production is scheduled by Cloud Scheduler -> Cloud Run. Set this only where Airflow is the orchestrator,
+# never both: two schedulers would run the pipeline twice against the same tables.
+SCHEDULE = os.environ.get("A365_EXTRACT_SCHEDULE") or None
+
+
 def extract(source: str, pipeline_run_id: str) -> dict:
     # "run_id" is reserved in the Airflow task context, hence the longer name
     return run_source(Settings.from_env(), source, pipeline_run_id)
@@ -18,7 +24,7 @@ def extract(source: str, pipeline_run_id: str) -> dict:
 with DAG(
     dag_id="a365_extract",
     description="API -> raw",
-    schedule="0 5 * * *",
+    schedule=SCHEDULE,
     start_date=pendulum.datetime(2026, 10, 27, tz="America/Argentina/Buenos_Aires"),
     catchup=False,
     max_active_runs=1,
