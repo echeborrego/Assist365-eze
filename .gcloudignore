@@ -1,3 +1,6 @@
+# .gitignore patterns (secrets, keys, local data) apply too: gcloud ignores .gitignore once this file exists
+#!include:.gitignore
+
 # Upload only what the image needs; never secrets or local state
 .env
 .env.*
