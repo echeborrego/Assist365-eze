@@ -40,6 +40,7 @@ Production uses Cloud Run because the project grants Run, Scheduler, Build and B
 ```bash
 cp .env.example .env                     # add the API token
 uv venv && uv pip install -r requirements.txt
+uv pip install -r mcp_server/requirements.txt   # only for the MCP server; .mcp.json expects the venv in .venv/
 gcloud auth application-default login
 
 python main.py                           # extract + transform + tests
@@ -133,8 +134,9 @@ All of these are handled and flagged; counts and rules are in `docs/DECISIONS.md
 ## Semantic layer and MCP (bonus 1)
 
 - **Skill:** `.claude/skills/assist365-warehouse/`. `SKILL.md` holds the glossary, metric definitions and the rules that change answers. `data_model.md` describes every table; `common_queries.md` has the canonical SQL for each metric.
-- **MCP server:** `mcp_server/bigquery_server.py`, registered in `.mcp.json`. It is read-only (`SELECT`/`WITH`, a single statement, no `raw`), dry-runs every query, and has a hard bytes ceiling (`maximum_bytes_billed`). It runs locally over stdio with your gcloud credentials; open Claude Code in the repo and approve the `assist365-bigquery` server.
-- **Five business questions** answered through MCP: [`docs/MCP_QUESTIONS.md`](docs/MCP_QUESTIONS.md), reproducible with `python mcp_server/ask.py`.
+- **MCP server:** `mcp_server/bigquery_server.py`, registered in `.mcp.json`. Every query is dry-run first: BigQuery's own parse must say it is a `SELECT` that only reads `dwh` or `staging`, and a hard bytes ceiling (`maximum_bytes_billed`) applies. It runs locally over stdio with your gcloud credentials; open Claude Code in the repo and approve the `assist365-bigquery` server.
+- **Five business questions in natural language**, answered by Claude Code with the skill and the MCP server: [`docs/MCP_SESSION.md`](docs/MCP_SESSION.md), the exported session with each question, the SQL it wrote and the result.
+- **Regression check:** `python mcp_server/ask.py` runs the same five questions as fixed SQL through the server and writes [`docs/MCP_CHECK.md`](docs/MCP_CHECK.md).
 
 ## Data tests
 

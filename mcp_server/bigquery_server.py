@@ -1,7 +1,7 @@
 """Read-only BigQuery MCP server for the Assist-365 warehouse (stdio; registered in .mcp.json).
 
-Guards: SELECT/WITH only, a single statement, datasets limited to staging and dwh, a dry run before every query,
-and a hard bytes ceiling enforced by BigQuery itself (maximum_bytes_billed).
+Guards: a SELECT/WITH prefix check, then a dry run whose statement type and referenced tables BigQuery itself reports
+(SELECT only, staging and dwh only), and a hard bytes ceiling enforced by BigQuery (maximum_bytes_billed).
 """
 import os
 import re
@@ -33,10 +33,6 @@ def _read_only_error(sql: str) -> str | None:
     body = _LEADING_COMMENTS.sub("", sql).strip().rstrip(";").strip()
     if not body.upper().startswith(("SELECT", "WITH")):
         return "Only SELECT or WITH queries are allowed."
-    if ";" in body:
-        return "Only a single statement is allowed."
-    if re.search(r"\braw\.", body, re.IGNORECASE):
-        return "Query the modelled datasets (dwh, staging), not raw."
     return None
 
 
@@ -76,6 +72,12 @@ def execute_sql(sql: str) -> dict:
     if error:
         return {"error": error}
     dry = _bq().query(sql, job_config=bigquery.QueryJobConfig(dry_run=True, use_query_cache=False))
+    # BigQuery's own parse is the authority: statement type and the tables actually referenced
+    if dry.statement_type != "SELECT":
+        return {"error": f"Only SELECT queries are allowed (got {dry.statement_type})."}
+    outside = sorted({t.dataset_id for t in dry.referenced_tables} - set(DATASETS))
+    if outside:
+        return {"error": f"Query the modelled datasets {DATASETS}; this one reads {outside}."}
     if dry.total_bytes_processed > MAX_BYTES:
         return {"error": f"Query would process {dry.total_bytes_processed / 1e6:.1f} MB, above the "
                          f"{MAX_BYTES / 1e6:.0f} MB ceiling. Use the dwh aggregates or filter on the partition column."}

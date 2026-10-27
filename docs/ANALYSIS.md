@@ -1,6 +1,6 @@
 # Analysis
 
-Figures from the warehouse on 2026-10-27, all in USD. Definitions are in [DECISIONS.md](DECISIONS.md):
+Figures from the warehouse on 2026-10-27, all in USD, over the **full period** (policies issued 2023-12-31 to 2026-08-30). The dashboard opens on the last five issue quarters, so its plan figures differ slightly. Definitions are in [DECISIONS.md](DECISIONS.md):
 
 - **Written premium** excludes cancelled policies (M2).
 - **Claims cost** is `PAGADO` only (M1).

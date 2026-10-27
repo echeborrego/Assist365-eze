@@ -1,7 +1,7 @@
-# Business questions answered through MCP
+# MCP server check
 
-Each question below was answered by calling the `execute_sql` tool of the `assist365-bigquery` MCP server
-over stdio (`mcp_server/ask.py`). The SQL follows the `assist365-warehouse` skill.
+Fixed SQL for the five business questions, run through the `execute_sql` tool of the `assist365-bigquery`
+MCP server over stdio (`mcp_server/ask.py`). The natural-language answers are in `MCP_SESSION.md`.
 
 MCP tools exposed: `list_tables`, `describe_table`, `execute_sql`
 
@@ -28,7 +28,7 @@ ORDER BY 3 DESC
 | 2026-Q2 | Perú | 0.385 | 0.985 |
 | 2026-Q2 | Brasil | 0.371 | 0.986 |
 
-_0.151 MB processed_
+_0.0 MB processed_
 
 ## 2. ¿Qué plan destruye más margen, y es por frecuencia, severidad o precio?
 
@@ -51,7 +51,7 @@ LIMIT 3
 | Estudiante Larga | 1.149 | 0.139 | 344 | 41.7 |
 | Esencial 30 | 0.819 | 0.14 | 365 | 62.6 |
 
-_0.168 MB processed_
+_0.0 MB processed_
 
 ## 3. ¿Cuánto pagaron los planes de equipaje y cancelación en siniestros de otro tipo de riesgo?
 
@@ -70,7 +70,7 @@ GROUP BY 1
 | Cancelacion Plus | 2468668 | 0.879 |
 | Equipaje Protegido | 1857961 | 0.909 |
 
-_0.378 MB processed_
+_0.0 MB processed_
 
 ## 4. ¿Qué canal de venta compra con más anticipación respecto del viaje (último trimestre cerrado)?
 
@@ -94,7 +94,7 @@ ORDER BY 3 DESC
 | agencia | 16421 | 49.6 |
 | meta | 14986 | 49.4 |
 
-_1.827 MB processed_
+_0.0 MB processed_
 
 ## 5. ¿Cuánta exposición pendiente (siniestros en análisis) hay por país, en USD?
 
@@ -118,4 +118,4 @@ ORDER BY 3 DESC
 | Perú | 877 | 324739 | 0.085 |
 | Brasil | 759 | 319669 | 0.102 |
 
-_0.113 MB processed_
+_0.0 MB processed_

@@ -1,4 +1,8 @@
-"""Answers the five business questions through the MCP server over stdio and writes docs/MCP_QUESTIONS.md."""
+"""Regression check for the MCP server: runs five fixed queries through it over stdio and writes docs/MCP_CHECK.md.
+
+The natural-language answers (skill + MCP in Claude Code) are in docs/MCP_SESSION.md; this script only proves the
+server still answers the same questions with the same numbers.
+"""
 import asyncio
 import json
 import sys
@@ -82,9 +86,9 @@ def _table(rows: list[dict]) -> str:
 
 async def main() -> None:
     server = StdioServerParameters(command=sys.executable, args=[str(ROOT / "mcp_server" / "bigquery_server.py")])
-    out = ["# Business questions answered through MCP", "",
-           "Each question below was answered by calling the `execute_sql` tool of the `assist365-bigquery` MCP server",
-           "over stdio (`mcp_server/ask.py`). The SQL follows the `assist365-warehouse` skill.", ""]
+    out = ["# MCP server check", "",
+           "Fixed SQL for the five business questions, run through the `execute_sql` tool of the `assist365-bigquery`",
+           "MCP server over stdio (`mcp_server/ask.py`). The natural-language answers are in `MCP_SESSION.md`.", ""]
     async with stdio_client(server) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
@@ -98,7 +102,7 @@ async def main() -> None:
                     out += [f"**Error:** {payload['error']}", ""]
                 else:
                     out += [_table(payload["rows"]), "", f"_{payload['mb_processed']} MB processed_", ""]
-    (ROOT / "docs" / "MCP_QUESTIONS.md").write_text("\n".join(out))
+    (ROOT / "docs" / "MCP_CHECK.md").write_text("\n".join(out))
 
 
 if __name__ == "__main__":
