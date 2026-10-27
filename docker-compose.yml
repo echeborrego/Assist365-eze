@@ -1,5 +1,5 @@
 # Local Airflow with UI for developing and demoing the DAG: docker compose up, then http://localhost:8080
-# (user "admin", password: docker compose exec airflow cat /opt/airflow/standalone_admin_password.txt).
+# (admin/admin: local only, never deployed).
 # Uses your gcloud application-default credentials; production runs on Cloud Run (deploy/deploy.sh).
 services:
   airflow:
@@ -12,6 +12,11 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
       GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcloud/application_default_credentials.json
+      AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
       _PIP_ADDITIONAL_REQUIREMENTS: "google-cloud-bigquery==3.27.0 python-dotenv==1.0.1"
     volumes:
       - ./dags:/opt/airflow/dags
