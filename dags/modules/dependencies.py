@@ -10,9 +10,10 @@ UPSTREAM = {  # model: requires_this_model or [requires_these_models]
     "staging_Siniestro": "staging_Poliza",
     "dwh_Producto": "staging_Producto",
     "dwh_Agencia": "staging_Agencia",
-    "dwh_Venta": ["staging_Poliza", "staging_TipoCambio"],
-    "dwh_Siniestro": ["staging_Siniestro", "staging_TipoCambio", "dwh_Venta"],
-    "dwh_SiniestralidadMensual": ["dwh_Venta", "dwh_Siniestro", "dwh_Producto", "dwh_Pais"],
+    "dwh_Poliza": ["staging_Poliza", "staging_TipoCambio"],
+    "dwh_Siniestro": ["staging_Siniestro", "staging_TipoCambio", "dwh_Poliza"],
+    "dwh_SiniestralidadMensual": ["dwh_Poliza", "dwh_Siniestro", "dwh_Producto", "dwh_Pais"],
+    "dwh_SiniestroPorTipo": ["dwh_Siniestro", "dwh_Producto", "dwh_Pais"],
 }
 
 _BUILDS = re.compile(r"(?:CREATE OR REPLACE TABLE|CREATE TABLE IF NOT EXISTS|MERGE)\s+((?:staging|dwh)\.\w+)")
@@ -25,7 +26,7 @@ def upstream_of(model: str) -> list[str]:
 
 
 def models() -> dict[str, Path]:
-    """{model: sql path}; a model is <layer>_<file name>, e.g. dwh_Venta."""
+    """{model: sql path}; a model is <layer>_<file name>, e.g. dwh_Poliza."""
     return {f"{layer}_{p.stem}": p for layer in LAYERS for p in sorted((SQL_DIR / layer).glob("*.sql"))}
 
 

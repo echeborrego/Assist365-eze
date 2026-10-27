@@ -23,7 +23,7 @@ WITH UltimoRun AS (
         , (SELECT COUNT(DISTINCT JSON_VALUE(r.Payload.poliza_id)) FROM raw.Poliza r) AS RawPolizaIds
         , (SELECT COUNT(*) FROM staging.Poliza) AS StgPolizas
         , (SELECT COUNTIF(NOT IsDeleted) FROM staging.Poliza) AS StgPolizasVivas
-        , (SELECT COUNT(*) FROM dwh.Venta) AS FctVentas
+        , (SELECT COUNT(*) FROM dwh.Poliza) AS FctVentas
 )
 SELECT *
 FROM Conteos

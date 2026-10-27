@@ -32,6 +32,6 @@ SELECT
     -- Official metrics: real date and a policy to attribute it to (D8, D13)
     , NOT s.EsFechaFutura AND NOT s.EsPolizaInexistente AS CuentaParaSiniestralidad
 FROM staging.Siniestro s
-LEFT JOIN dwh.Venta v ON v.PolizaId = s.PolizaId
+LEFT JOIN dwh.Poliza v ON v.PolizaId = s.PolizaId
 LEFT JOIN staging.TipoCambio fx ON fx.Moneda = s.Moneda AND fx.Fecha = s.FechaOcurrencia
 WHERE NOT s.EsPolizaEliminada
