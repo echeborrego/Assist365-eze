@@ -2,17 +2,17 @@
 -- Incremental: only raw partitions loaded since the last run are read and merged in.
 -- Reads one day back from the watermark: a slower run can commit rows stamped before it (ExtractedAt is
 -- set when spooling starts), and the MERGE only applies newer changes, so reprocessing is harmless.
--- Rebuild: drop staging.polizas; an empty table reprocesses all of raw.
+-- Rebuild: drop staging.Poliza; an empty table reprocesses all of raw.
 DECLARE Desde TIMESTAMP;
 DECLARE Hasta TIMESTAMP;
 
-CREATE TABLE IF NOT EXISTS staging.watermarks (
+CREATE TABLE IF NOT EXISTS staging.Watermark (
     Modelo STRING NOT NULL
     , ProcesadoHasta TIMESTAMP NOT NULL
     , ActualizadoAt TIMESTAMP NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS staging.polizas (
+CREATE TABLE IF NOT EXISTS staging.Poliza (
     PolizaId STRING NOT NULL
     , ClienteId STRING
     , ProductoId STRING
@@ -34,17 +34,17 @@ CREATE TABLE IF NOT EXISTS staging.polizas (
 CLUSTER BY PaisEmision, ProductoId;
 
 SET Desde = IF(
-    (SELECT COUNT(*) FROM staging.polizas) = 0
+    (SELECT COUNT(*) FROM staging.Poliza) = 0
     , TIMESTAMP "1970-01-01"
-    , (SELECT MAX(ProcesadoHasta) FROM staging.watermarks WHERE Modelo = "polizas")
+    , (SELECT MAX(ProcesadoHasta) FROM staging.Watermark WHERE Modelo = "Poliza")
 );
 SET Desde = TIMESTAMP_SUB(IFNULL(Desde, TIMESTAMP "1970-01-02"), INTERVAL 1 DAY);
-SET Hasta = (SELECT MAX(r.ExtractedAt) FROM raw.polizas r WHERE r.ExtractedAt > Desde);
+SET Hasta = (SELECT MAX(r.ExtractedAt) FROM raw.Poliza r WHERE r.ExtractedAt > Desde);
 
 IF Hasta IS NOT NULL THEN
     BEGIN TRANSACTION;
 
-    MERGE staging.polizas t
+    MERGE staging.Poliza t
     USING (
         WITH Cambios AS (
             SELECT
@@ -63,7 +63,7 @@ IF Hasta IS NOT NULL THEN
                 , JSON_VALUE(r.Payload.op) AS Op
                 , SAFE.PARSE_TIMESTAMP("%Y-%m-%dT%H:%M:%SZ", JSON_VALUE(r.Payload.updated_at)) AS UpdatedAt
                 , r.ExtractedAt
-            FROM raw.polizas r
+            FROM raw.Poliza r
             WHERE r.ExtractedAt > Desde
                 AND r.ExtractedAt <= Hasta
         )
@@ -133,9 +133,9 @@ IF Hasta IS NOT NULL THEN
         , s.InicioVigencia, s.FinVigencia, s.Prima, s.Moneda, s.Estado, s.IsDeleted, s.UltimaOp, s.UpdatedAt, s.ExtractedAt
     );
 
-    DELETE FROM staging.watermarks WHERE Modelo = "polizas";
-    INSERT INTO staging.watermarks (Modelo, ProcesadoHasta, ActualizadoAt)
-    VALUES ("polizas", Hasta, CURRENT_TIMESTAMP());
+    DELETE FROM staging.Watermark WHERE Modelo = "Poliza";
+    INSERT INTO staging.Watermark (Modelo, ProcesadoHasta, ActualizadoAt)
+    VALUES ("Poliza", Hasta, CURRENT_TIMESTAMP());
 
     COMMIT TRANSACTION;
 END IF;
