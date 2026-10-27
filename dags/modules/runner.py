@@ -12,6 +12,7 @@ from modules.config import Settings
 log = logging.getLogger(__name__)
 
 SOURCES = ("catalogos", "siniestros", "polizas")
+CATALOG_TABLES = {"productos": "CatalogoProducto", "agencias": "CatalogoAgencia", "tipo_cambio": "CatalogoTipoCambio"}
 
 
 def new_run_id() -> str:
@@ -40,12 +41,12 @@ def _track_max(pages: Iterable[tuple[int, list[dict]]], key: str, ceiling: datet
 
 
 def run_source(settings: Settings, source: str, run_id: str | None = None, full_refresh: bool = False) -> dict:
-    """Extracts one source into raw.* and logs the outcome to raw.extract_runs. Callable from CLI or Airflow."""
+    """Extracts one source into raw.* and logs the outcome to raw.ExtractRun. Callable from CLI or Airflow."""
     run_id = run_id or new_run_id()
     bq = bigquery.Client(project=settings.gcp_project, location=settings.bq_location)
     api = ApiClient(settings.api_base_url, settings.api_token)
     raw = f"{settings.gcp_project}.raw"
-    runs_table = f"{raw}.extract_runs"
+    runs_table = f"{raw}.ExtractRun"
     load.ensure_datasets(bq, ["raw"], settings.bq_location)
 
     run = {"RunId": run_id, "Source": source, "Status": "failed",
@@ -59,12 +60,12 @@ def run_source(settings: Settings, source: str, run_id: str | None = None, full_
             state = {"max": _parse_ts(since)}
             pages = _track_max(extract.polizas(api, since), "updated_at", datetime.now(timezone.utc), state)
             run["Pages"], run["RowsLoaded"], run["NonFiniteNulled"] = load.load_pages(
-                bq, f"{raw}.polizas", pages, run_id, "WRITE_APPEND", partitioned=True, progress=progress)
+                bq, f"{raw}.Poliza", pages, run_id, "WRITE_APPEND", partitioned=True, progress=progress)
             run["Watermark"] = f"{state['max'].astimezone(timezone.utc):%Y-%m-%dT%H:%M:%SZ}" if state["max"] else None
         elif source == "siniestros":
             # No incremental filter in the API: append a full daily snapshot, staging reads the latest one
             run["Pages"], run["RowsLoaded"], run["NonFiniteNulled"] = load.load_pages(
-                bq, f"{raw}.siniestros", extract.siniestros(api, meta), run_id, "WRITE_APPEND", partitioned=True,
+                bq, f"{raw}.Siniestro", extract.siniestros(api, meta), run_id, "WRITE_APPEND", partitioned=True,
                 expected_range=lambda: (meta["first_total"], meta["last_total"]) if meta else None,
                 tolerance=settings.row_count_tolerance, progress=progress)
         elif source == "catalogos":
@@ -73,7 +74,7 @@ def run_source(settings: Settings, source: str, run_id: str | None = None, full_
                 rows, total = extract.catalogo(api, tipo)
                 run["RowsExpected"] += total
                 n_pages, n_rows, n_nulled = load.load_pages(
-                    bq, f"{raw}.catalogo_{tipo}", [(0, rows)], run_id, "WRITE_TRUNCATE", partitioned=False,
+                    bq, f"{raw}.{CATALOG_TABLES[tipo]}", [(0, rows)], run_id, "WRITE_TRUNCATE", partitioned=False,
                     expected_range=lambda total=total: (total, total), tolerance=settings.row_count_tolerance,
                     progress=progress)
                 run["Pages"] += n_pages
