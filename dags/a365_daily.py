@@ -20,8 +20,9 @@ from modules.transform import run_models, run_tests
 )
 def a365_daily():
     @task
-    def extract(source: str, run_id: str) -> dict:
-        return run_source(Settings.from_env(), source, run_id)
+    def extract(source: str, pipeline_run_id: str) -> dict:
+        # "run_id" is reserved in the Airflow task context, hence the longer name
+        return run_source(Settings.from_env(), source, pipeline_run_id)
 
     @task
     def transform() -> None:
@@ -31,8 +32,9 @@ def a365_daily():
     def data_tests() -> None:
         run_tests(Settings.from_env())
 
-    run_id = "{{ ts_nodash }}"
-    extracts = [extract.override(task_id=f"extract_{s}")(s, run_id) for s in ("catalogos", "siniestros", "polizas")]
+    pipeline_run_id = "{{ ts_nodash }}"
+    extracts = [extract.override(task_id=f"extract_{s}")(s, pipeline_run_id)
+                for s in ("catalogos", "siniestros", "polizas")]
     extracts >> transform() >> data_tests()
 
 
