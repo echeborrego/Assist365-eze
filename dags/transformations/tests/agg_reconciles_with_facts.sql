@@ -4,13 +4,13 @@ WITH Agg AS (
         SUM(PrimaEmitidaUsd) AS Prima
         , SUM(CostoSiniestrosUsd) AS Costo
         , SUM(SiniestrosPagados) AS Pagados
-    FROM ${dwh}.agg_siniestralidad_mensual
+    FROM dwh.agg_siniestralidad_mensual
 )
 , Hechos AS (
     SELECT
-        (SELECT SUM(PrimaEmitidaUsd) FROM ${dwh}.fct_ventas) AS Prima
-        , (SELECT SUM(MontoUsd) FROM ${dwh}.fct_siniestros WHERE CuentaParaSiniestralidad AND Estado = "PAGADO") AS Costo
-        , (SELECT COUNT(*) FROM ${dwh}.fct_siniestros WHERE CuentaParaSiniestralidad AND Estado = "PAGADO") AS Pagados
+        (SELECT SUM(PrimaEmitidaUsd) FROM dwh.fct_ventas) AS Prima
+        , (SELECT SUM(MontoUsd) FROM dwh.fct_siniestros WHERE CuentaParaSiniestralidad AND Estado = "PAGADO") AS Costo
+        , (SELECT COUNT(*) FROM dwh.fct_siniestros WHERE CuentaParaSiniestralidad AND Estado = "PAGADO") AS Pagados
 )
 SELECT
     a.Prima AS PrimaAgg

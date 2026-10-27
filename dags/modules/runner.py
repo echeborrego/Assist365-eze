@@ -44,9 +44,9 @@ def run_source(settings: Settings, source: str, run_id: str | None = None, full_
     run_id = run_id or new_run_id()
     bq = bigquery.Client(project=settings.gcp_project, location=settings.bq_location)
     api = ApiClient(settings.api_base_url, settings.api_token)
-    raw = f"{settings.gcp_project}.{settings.raw_dataset}"
+    raw = f"{settings.gcp_project}.raw"
     runs_table = f"{raw}.extract_runs"
-    load.ensure_datasets(bq, [settings.raw_dataset], settings.bq_location)
+    load.ensure_datasets(bq, ["raw"], settings.bq_location)
 
     run = {"RunId": run_id, "Source": source, "Status": "failed",
            "StartedAt": datetime.now(timezone.utc).isoformat(), "Pages": 0, "RowsLoaded": 0, "NonFiniteNulled": 0}

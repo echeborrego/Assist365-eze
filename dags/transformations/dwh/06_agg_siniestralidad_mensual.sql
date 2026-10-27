@@ -1,6 +1,6 @@
 -- Grain: one row per issue month (policy cohort) x issuing country x plan. Feeds the dashboard.
 -- Claims are attributed to their policy's issue month (underwriting basis, M4).
-CREATE OR REPLACE TABLE ${dwh}.agg_siniestralidad_mensual
+CREATE OR REPLACE TABLE dwh.agg_siniestralidad_mensual
 CLUSTER BY PaisEmision, ProductoId AS
 WITH Ventas AS (
     SELECT
@@ -11,7 +11,7 @@ WITH Ventas AS (
         , COUNTIF(v.EsAnulada) AS PolizasAnuladas
         , COUNTIF(NOT v.EsAnulada AND v.EsCoberturaTerminada) AS PolizasCoberturaTerminada
         , SUM(v.PrimaEmitidaUsd) AS PrimaEmitidaUsd
-    FROM ${dwh}.fct_ventas v
+    FROM dwh.fct_ventas v
     GROUP BY 1, 2, 3
 )
 , Siniestros AS (
@@ -26,7 +26,7 @@ WITH Ventas AS (
         , COUNTIF(s.Estado = "RECHAZADO") AS SiniestrosRechazados
         , SUM(IF(s.Estado = "PAGADO" AND (s.EsPolizaAnulada OR s.EsFueraDeVigencia), s.MontoUsd, 0)) AS PagadoSinCoberturaUsd
         , COUNTIF(s.Estado = "PAGADO" AND (s.EsPolizaAnulada OR s.EsFueraDeVigencia)) AS PagadosSinCobertura
-    FROM ${dwh}.fct_siniestros s
+    FROM dwh.fct_siniestros s
     WHERE s.CuentaParaSiniestralidad
     GROUP BY 1, 2, 3
 )
@@ -52,5 +52,5 @@ SELECT
     , ROUND(IFNULL(s.PagadoSinCoberturaUsd, 0), 2) AS PagadoSinCoberturaUsd
 FROM Ventas v
 LEFT JOIN Siniestros s USING (MesEmision, PaisEmision, ProductoId)
-LEFT JOIN ${dwh}.dim_pais p ON p.PaisId = v.PaisEmision
-LEFT JOIN ${dwh}.dim_producto d ON d.ProductoId = v.ProductoId
+LEFT JOIN dwh.dim_pais p ON p.PaisId = v.PaisEmision
+LEFT JOIN dwh.dim_producto d ON d.ProductoId = v.ProductoId
