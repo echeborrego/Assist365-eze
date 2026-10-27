@@ -11,7 +11,7 @@ WITH Ventas AS (
         , COUNTIF(v.EsAnulada) AS PolizasAnuladas
         , COUNTIF(NOT v.EsAnulada AND v.EsCoberturaTerminada) AS PolizasCoberturaTerminada
         , SUM(v.PrimaEmitidaUsd) AS PrimaEmitidaUsd
-    FROM dwh.Venta v
+    FROM dwh.Poliza v
     GROUP BY 1, 2, 3
 )
 , Siniestros AS (
@@ -20,6 +20,8 @@ WITH Ventas AS (
         , s.PaisEmision
         , s.ProductoId
         , COUNTIF(s.Estado = "PAGADO") AS SiniestrosPagados
+        -- Frequency numerator: paid claims on policies that count in Polizas (cancelled ones do not, M2)
+        , COUNTIF(s.Estado = "PAGADO" AND NOT s.EsPolizaAnulada) AS SiniestrosPagadosConCobertura
         , SUM(IF(s.Estado = "PAGADO", s.MontoUsd, 0)) AS CostoSiniestrosUsd
         , COUNTIF(s.Estado = "EN_ANALISIS") AS SiniestrosEnAnalisis
         , SUM(IF(s.Estado = "EN_ANALISIS", s.MontoUsd, 0)) AS EnAnalisisUsd
@@ -44,6 +46,7 @@ SELECT
     , v.PolizasCoberturaTerminada
     , ROUND(v.PrimaEmitidaUsd, 2) AS PrimaEmitidaUsd
     , IFNULL(s.SiniestrosPagados, 0) AS SiniestrosPagados
+    , IFNULL(s.SiniestrosPagadosConCobertura, 0) AS SiniestrosPagadosConCobertura
     , ROUND(IFNULL(s.CostoSiniestrosUsd, 0), 2) AS CostoSiniestrosUsd
     , IFNULL(s.SiniestrosEnAnalisis, 0) AS SiniestrosEnAnalisis
     , ROUND(IFNULL(s.EnAnalisisUsd, 0), 2) AS EnAnalisisUsd

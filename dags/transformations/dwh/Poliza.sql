@@ -1,6 +1,6 @@
 -- Grain: one row per policy sold (deleted policies excluded, D9).
 -- Cancelled policies stay as rows but add no written premium (M2).
-CREATE OR REPLACE TABLE dwh.Venta
+CREATE OR REPLACE TABLE dwh.Poliza
 PARTITION BY DATE_TRUNC(FechaEmision, MONTH)
 CLUSTER BY PaisEmision, ProductoId AS
 SELECT
