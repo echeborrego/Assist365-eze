@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from pipeline.api_client import ApiClient
+from modules.api_client import ApiClient
 
 SINIESTROS_PAGE_SIZE = 500
 CATALOGOS = ("productos", "agencias", "tipo_cambio")

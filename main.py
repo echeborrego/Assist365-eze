@@ -1,10 +1,14 @@
 import argparse
 import logging
 import sys
+from pathlib import Path
 
-from pipeline.config import Settings
-from pipeline.runner import SOURCES, new_run_id, run_source
-from pipeline.transform import run_models, run_tests
+# Same import root Airflow uses, so modules/ resolves identically on Cloud Run and Composer
+sys.path.insert(0, str(Path(__file__).resolve().parent / "dags"))
+
+from modules.config import Settings
+from modules.runner import SOURCES, new_run_id, run_source
+from modules.transform import run_models, run_tests
 
 
 def main() -> int:

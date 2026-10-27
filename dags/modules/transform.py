@@ -3,12 +3,12 @@ from pathlib import Path
 
 from google.cloud import bigquery
 
-from pipeline import load
-from pipeline.config import Settings
+from modules import load
+from modules.config import Settings
 
 log = logging.getLogger(__name__)
 
-SQL_DIR = Path(__file__).resolve().parent.parent / "sql"
+SQL_DIR = Path(__file__).resolve().parent.parent / "transformations"
 LAYERS = ("staging", "dwh")
 
 
@@ -24,7 +24,7 @@ def _run(bq: bigquery.Client, path: Path) -> bigquery.QueryJob:
 
 
 def run_models(settings: Settings) -> None:
-    """Runs sql/staging then sql/dwh in filename order; each file is one CREATE OR REPLACE statement."""
+    """Runs transformations/staging then transformations/dwh in filename order; each file is one CREATE OR REPLACE statement."""
     bq = bigquery.Client(project=settings.gcp_project, location=settings.bq_location)
     load.ensure_datasets(bq, [settings.staging_dataset, settings.dwh_dataset], settings.bq_location)
     for layer in LAYERS:
@@ -33,7 +33,7 @@ def run_models(settings: Settings) -> None:
 
 
 def run_tests(settings: Settings) -> None:
-    """Each sql/tests file returns the rows that break a rule; any row fails the run."""
+    """Each transformations/tests file returns the rows that break a rule; any row fails the run."""
     bq = bigquery.Client(project=settings.gcp_project, location=settings.bq_location)
     failures = []
     for path in sorted((SQL_DIR / "tests").glob("*.sql")):

@@ -3,9 +3,9 @@ from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
 
-from pipeline.config import Settings
-from pipeline.runner import run_source
-from pipeline.transform import run_models, run_tests
+from modules.config import Settings
+from modules.runner import run_source
+from modules.transform import run_models, run_tests
 
 
 @dag(

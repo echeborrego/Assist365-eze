@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 
 from google.cloud import bigquery
 
-from pipeline import extract, load
-from pipeline.api_client import ApiClient
-from pipeline.config import Settings
+from modules import extract, load
+from modules.api_client import ApiClient
+from modules.config import Settings
 
 log = logging.getLogger(__name__)
 
