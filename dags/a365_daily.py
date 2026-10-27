@@ -1,6 +1,7 @@
 """Composer/Airflow version of the daily job: the same pipeline functions the Cloud Run Job runs via main.py."""
-from datetime import datetime, timedelta
+from datetime import timedelta
 
+import pendulum
 from airflow.decorators import dag, task
 
 from modules.config import Settings
@@ -10,8 +11,8 @@ from modules.transform import run_models, run_tests
 
 @dag(
     dag_id="a365_daily",
-    schedule="0 6 * * *",
-    start_date=datetime(2026, 10, 27),
+    schedule="0 5 * * *",
+    start_date=pendulum.datetime(2026, 10, 27, tz="America/Argentina/Buenos_Aires"),
     catchup=False,
     default_args={"retries": 2, "retry_delay": timedelta(minutes=5)},
     tags=["assist365"],
