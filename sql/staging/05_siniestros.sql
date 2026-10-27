@@ -1,0 +1,67 @@
+-- Grain: one row per claim_id from the latest successful daily snapshot.
+-- Data-quality flags are kept on the row; dwh decides what counts (see docs/DECISIONS.md).
+DECLARE UltimoRun STRING;
+DECLARE UltimoExtract TIMESTAMP;
+DECLARE Hoy DATE DEFAULT CURRENT_DATE("America/Argentina/Buenos_Aires");
+
+SET (UltimoRun, UltimoExtract) = (
+    SELECT AS STRUCT
+        RunId
+        , StartedAt
+    FROM raw.extract_runs
+    WHERE Source = "siniestros"
+        AND Status = "success"
+    ORDER BY StartedAt DESC
+    LIMIT 1
+);
+
+CREATE OR REPLACE TABLE staging.siniestros
+CLUSTER BY PolizaId AS
+WITH Snapshot AS (
+    SELECT
+        JSON_VALUE(r.Payload.claim_id) AS SiniestroId
+        , JSON_VALUE(r.Payload.policy_id) AS PolizaId
+        , COALESCE(
+            SAFE.PARSE_DATE("%Y-%m-%d", JSON_VALUE(r.Payload.occurred_at))
+            , SAFE.PARSE_DATE("%d/%m/%Y", JSON_VALUE(r.Payload.occurred_at))
+        ) AS FechaOcurrencia
+        , COALESCE(
+            SAFE.PARSE_DATE("%Y-%m-%d", JSON_VALUE(r.Payload.reported_at))
+            , SAFE.PARSE_DATE("%d/%m/%Y", JSON_VALUE(r.Payload.reported_at))
+        ) AS FechaReporte
+        , JSON_VALUE(r.Payload.type) AS Tipo
+        , JSON_VALUE(r.Payload.status) AS Estado
+        , SAFE_CAST(JSON_VALUE(r.Payload.amount.value) AS NUMERIC) AS MontoOrigen
+        , JSON_VALUE(r.Payload.amount.currency) AS MonedaOrigen
+        , JSON_VALUE(r.Payload.detail.proveedor) AS Proveedor
+        , COALESCE(JSON_VALUE(r.Payload.detail.diagnostico), JSON_VALUE(r.Payload.detail.diagnosis)) AS Diagnostico
+        , COALESCE(JSON_VALUE(r.Payload.detail.ciudad_atencion), JSON_VALUE(r.Payload.detail.city)) AS CiudadAtencion
+        , r.Payload.detail AS DetalleOrigen
+    FROM raw.siniestros r
+    WHERE r.ExtractedAt >= UltimoExtract
+        AND r.RunId = UltimoRun
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY JSON_VALUE(r.Payload.claim_id) ORDER BY r.Page) = 1
+)
+SELECT
+    s.SiniestroId
+    , s.PolizaId
+    , s.FechaOcurrencia
+    , s.FechaReporte
+    , s.Tipo
+    , s.Estado
+    , ABS(s.MontoOrigen) AS Monto
+    , COALESCE(s.MonedaOrigen, p.Moneda) AS Moneda
+    , s.Proveedor
+    , s.Diagnostico
+    , s.CiudadAtencion
+    , s.DetalleOrigen
+    , s.MontoOrigen < 0 AS EsMontoNegativoOrigen
+    , s.MonedaOrigen IS NULL AS EsMonedaInferida
+    , s.FechaOcurrencia > Hoy AS EsFechaFutura
+    , p.PolizaId IS NULL AS EsPolizaInexistente
+    , IFNULL(p.IsDeleted, FALSE) AS EsPolizaEliminada
+    , IFNULL(p.Estado = "ANULADA", FALSE) AS EsPolizaAnulada
+    , s.FechaOcurrencia NOT BETWEEN p.InicioVigencia AND p.FinVigencia AS EsFueraDeVigencia
+    , s.FechaReporte < s.FechaOcurrencia AS EsReporteAntesDeOcurrencia
+FROM Snapshot s
+LEFT JOIN staging.polizas p ON p.PolizaId = s.PolizaId
