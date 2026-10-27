@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "assist365-bigquery": {
+      "command": ".venv/bin/python",
+      "args": ["mcp_server/bigquery_server.py"],
+      "env": {
+        "GCP_PROJECT": "a365-de-ezequiel",
+        "BQ_LOCATION": "US"
+      }
+    }
+  }
+}
