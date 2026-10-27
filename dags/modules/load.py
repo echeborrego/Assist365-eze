@@ -27,6 +27,7 @@ RUNS_SCHEMA = [
     bigquery.SchemaField("Pages", "INTEGER"),
     bigquery.SchemaField("RowsLoaded", "INTEGER"),
     bigquery.SchemaField("RowsExpected", "INTEGER"),
+    bigquery.SchemaField("RowsReceived", "INTEGER"),
     bigquery.SchemaField("ApiCalls", "INTEGER"),
     bigquery.SchemaField("ApiRetries", "INTEGER"),
     bigquery.SchemaField("UpdatedSince", "STRING"),
@@ -62,11 +63,12 @@ def _nullify_non_finite(value, counter: list[int]):
 def load_pages(bq: bigquery.Client, table_id: str, pages: Iterable[tuple[int, list[dict]]], run_id: str,
                write_disposition: str, partitioned: bool,
                expected_range: Callable[[], tuple[int, int] | None] | None = None,
-               tolerance: float = 0.0) -> tuple[int, int, int]:
+               tolerance: float = 0.0, progress: dict | None = None) -> tuple[int, int, int]:
     """Spools every page to a gzipped NDJSON file, then loads it in ONE job so a failed run writes nothing.
 
     expected_range returns the source's own count at the start and end of the pull (it can grow mid-run);
     the raw rows received, before any cleaning, must fall in that range give or take the tolerance.
+    progress["received"] is kept up to date page by page, so the caller can log it even if the load fails.
     """
     extracted_at = datetime.now(timezone.utc).isoformat()
     n_pages = n_rows = 0
@@ -81,6 +83,8 @@ def load_pages(bq: bigquery.Client, table_id: str, pages: Iterable[tuple[int, li
                     f.write("\n")
                 n_pages += 1
                 n_rows += len(rows)
+                if progress is not None:
+                    progress["received"] = progress.get("received", 0) + len(rows)
                 if n_pages % 100 == 0:
                     log.info("%s: %d pages, %d rows spooled", table_id, n_pages, n_rows)
 

@@ -50,6 +50,7 @@ def run_source(settings: Settings, source: str, run_id: str | None = None, full_
 
     run = {"RunId": run_id, "Source": source, "Status": "failed",
            "StartedAt": datetime.now(timezone.utc).isoformat(), "Pages": 0, "RowsLoaded": 0, "NonFiniteNulled": 0}
+    progress, meta = {"received": 0}, {}
     try:
         if source == "polizas":
             # Incremental: resume from the last successful watermark; the API returns the whole page containing it
@@ -58,16 +59,14 @@ def run_source(settings: Settings, source: str, run_id: str | None = None, full_
             state = {"max": _parse_ts(since)}
             pages = _track_max(extract.polizas(api, since), "updated_at", datetime.now(timezone.utc), state)
             run["Pages"], run["RowsLoaded"], run["NonFiniteNulled"] = load.load_pages(
-                bq, f"{raw}.polizas", pages, run_id, "WRITE_APPEND", partitioned=True)
+                bq, f"{raw}.polizas", pages, run_id, "WRITE_APPEND", partitioned=True, progress=progress)
             run["Watermark"] = f"{state['max'].astimezone(timezone.utc):%Y-%m-%dT%H:%M:%SZ}" if state["max"] else None
         elif source == "siniestros":
             # No incremental filter in the API: append a full daily snapshot, staging reads the latest one
-            meta = {}
             run["Pages"], run["RowsLoaded"], run["NonFiniteNulled"] = load.load_pages(
                 bq, f"{raw}.siniestros", extract.siniestros(api, meta), run_id, "WRITE_APPEND", partitioned=True,
                 expected_range=lambda: (meta["first_total"], meta["last_total"]) if meta else None,
-                tolerance=settings.row_count_tolerance)
-            run["RowsExpected"] = meta.get("last_total")
+                tolerance=settings.row_count_tolerance, progress=progress)
         elif source == "catalogos":
             run["RowsExpected"] = 0
             for tipo in extract.CATALOGOS:
@@ -75,7 +74,8 @@ def run_source(settings: Settings, source: str, run_id: str | None = None, full_
                 run["RowsExpected"] += total
                 n_pages, n_rows, n_nulled = load.load_pages(
                     bq, f"{raw}.catalogo_{tipo}", [(0, rows)], run_id, "WRITE_TRUNCATE", partitioned=False,
-                    expected_range=lambda total=total: (total, total), tolerance=settings.row_count_tolerance)
+                    expected_range=lambda total=total: (total, total), tolerance=settings.row_count_tolerance,
+                    progress=progress)
                 run["Pages"] += n_pages
                 run["RowsLoaded"] += n_rows
                 run["NonFiniteNulled"] += n_nulled
@@ -88,6 +88,10 @@ def run_source(settings: Settings, source: str, run_id: str | None = None, full_
     finally:
         run["FinishedAt"] = datetime.now(timezone.utc).isoformat()
         run["ApiCalls"], run["ApiRetries"] = api.calls, api.retries
+        # Filled even when the run fails, so the audit row shows "received X, the API said Y"
+        run["RowsReceived"] = progress["received"]
+        if meta:
+            run["RowsExpected"] = meta["last_total"]
         try:
             load.log_run(bq, runs_table, run)
         except Exception:
