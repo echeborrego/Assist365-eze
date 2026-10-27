@@ -1,6 +1,6 @@
 -- Grain: one row per claim (claims on deleted policies excluded, D11).
 -- Carries its policy's issue date, country and plan so loss ratio is on an underwriting basis (M4).
-CREATE OR REPLACE TABLE dwh.fct_siniestros
+CREATE OR REPLACE TABLE ${dwh}.fct_siniestros
 PARTITION BY DATE_TRUNC(FechaEmisionPoliza, MONTH)
 CLUSTER BY PaisEmision, ProductoId AS
 SELECT
@@ -31,7 +31,7 @@ SELECT
     , IFNULL(s.EsFueraDeVigencia, FALSE) AS EsFueraDeVigencia
     -- Official metrics: real date and a policy to attribute it to (D8, D13)
     , NOT s.EsFechaFutura AND NOT s.EsPolizaInexistente AS CuentaParaSiniestralidad
-FROM staging.siniestros s
-LEFT JOIN dwh.fct_ventas v ON v.PolizaId = s.PolizaId
-LEFT JOIN staging.tipo_cambio fx ON fx.Moneda = s.Moneda AND fx.Fecha = s.FechaOcurrencia
+FROM ${staging}.siniestros s
+LEFT JOIN ${dwh}.fct_ventas v ON v.PolizaId = s.PolizaId
+LEFT JOIN ${staging}.tipo_cambio fx ON fx.Moneda = s.Moneda AND fx.Fecha = s.FechaOcurrencia
 WHERE NOT s.EsPolizaEliminada

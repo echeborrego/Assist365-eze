@@ -1,6 +1,6 @@
 -- Grain: one row per policy sold (deleted policies excluded, D9).
 -- Cancelled policies stay as rows but add no written premium (M2).
-CREATE OR REPLACE TABLE dwh.fct_ventas
+CREATE OR REPLACE TABLE ${dwh}.fct_ventas
 PARTITION BY DATE_TRUNC(FechaEmision, MONTH)
 CLUSTER BY PaisEmision, ProductoId AS
 SELECT
@@ -22,6 +22,6 @@ SELECT
     , fx.FactorUsd
     , ROUND(p.Prima * fx.FactorUsd, 2) AS PrimaUsd
     , IF(p.Estado = "ANULADA", 0, ROUND(p.Prima * fx.FactorUsd, 2)) AS PrimaEmitidaUsd
-FROM staging.polizas p
-LEFT JOIN staging.tipo_cambio fx ON fx.Moneda = p.Moneda AND fx.Fecha = p.FechaEmision
+FROM ${staging}.polizas p
+LEFT JOIN ${staging}.tipo_cambio fx ON fx.Moneda = p.Moneda AND fx.Fecha = p.FechaEmision
 WHERE NOT p.IsDeleted

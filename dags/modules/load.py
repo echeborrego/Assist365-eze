@@ -61,10 +61,12 @@ def _nullify_non_finite(value, counter: list[int]):
 
 def load_pages(bq: bigquery.Client, table_id: str, pages: Iterable[tuple[int, list[dict]]], run_id: str,
                write_disposition: str, partitioned: bool,
-               expected_rows: Callable[[], int | None] | None = None) -> tuple[int, int, int]:
+               expected_range: Callable[[], tuple[int, int] | None] | None = None,
+               tolerance: float = 0.0) -> tuple[int, int, int]:
     """Spools every page to a gzipped NDJSON file, then loads it in ONE job so a failed run writes nothing.
 
-    expected_rows returns the source's own count; the raw spool (duplicates included) must match it.
+    expected_range returns the source's own count at the start and end of the pull (it can grow mid-run);
+    the raw rows received, before any cleaning, must fall in that range give or take the tolerance.
     """
     extracted_at = datetime.now(timezone.utc).isoformat()
     n_pages = n_rows = 0
@@ -82,9 +84,14 @@ def load_pages(bq: bigquery.Client, table_id: str, pages: Iterable[tuple[int, li
                 if n_pages % 100 == 0:
                     log.info("%s: %d pages, %d rows spooled", table_id, n_pages, n_rows)
 
-        expected = expected_rows() if expected_rows else None
-        if expected is not None and n_rows != expected:
-            raise IncompleteExtractError(f"{table_id}: received {n_rows} rows, the API reports {expected}")
+        bounds = expected_range() if expected_range else None
+        if bounds is not None:
+            low, high = min(bounds), max(bounds)
+            if not low * (1 - tolerance) <= n_rows <= high * (1 + tolerance):
+                raise IncompleteExtractError(
+                    f"{table_id}: received {n_rows} rows, the API reported {low}..{high} (tolerance {tolerance:.2%})")
+            if not low <= n_rows <= high:
+                log.warning("%s: received %d rows, the API reported %d..%d; within tolerance", table_id, n_rows, low, high)
         if n_rows == 0:
             log.info("%s: nothing new, skipping load", table_id)
             return n_pages, 0, nulled[0]

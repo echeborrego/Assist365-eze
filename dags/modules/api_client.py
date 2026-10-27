@@ -1,6 +1,8 @@
 import logging
 import random
 import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 import requests
 
@@ -11,6 +13,18 @@ RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 class ApiError(Exception):
     pass
+
+
+def _retry_after_seconds(value: str | None) -> float | None:
+    """Retry-After is either a number of seconds or an HTTP date."""
+    if not value:
+        return None
+    if value.strip().isdigit():
+        return float(value)
+    try:
+        return max(0.0, (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds())
+    except (TypeError, ValueError):
+        return None
 
 
 class ApiClient:
@@ -47,8 +61,9 @@ class ApiClient:
             if attempt == self.max_attempts:
                 raise ApiError(f"Gave up on {path} {params} after {attempt} attempts: {reason}")
             delay = min(self.max_delay, self.base_delay * 2 ** (attempt - 1)) * random.uniform(0.5, 1.5)
-            if retry_after and retry_after.isdigit():
-                delay = max(delay, float(retry_after))
+            wait = _retry_after_seconds(retry_after)
+            if wait is not None:
+                delay = max(delay, min(wait, self.max_delay))
             self.retries += 1
             log.warning("%s on %s %s, retry %d in %.1fs", reason, path, params, attempt, delay)
             time.sleep(delay)

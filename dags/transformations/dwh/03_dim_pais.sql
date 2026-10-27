@@ -1,5 +1,5 @@
 -- Grain: one row per issuing country.
-CREATE OR REPLACE TABLE dwh.dim_pais AS
+CREATE OR REPLACE TABLE ${dwh}.dim_pais AS
 SELECT * FROM UNNEST([
     STRUCT("AR" AS PaisId, "Argentina" AS NombrePais, "ARS" AS MonedaLocal, "America/Argentina/Buenos_Aires" AS ZonaHoraria)
     , ("BR", "Brasil", "BRL", "America/Sao_Paulo")

@@ -1,7 +1,7 @@
 -- Grain: one row per currency per calendar day, from a week before the first quote up to today.
 -- The source only quotes business days, so weekends/holidays carry the last known rate forward;
 -- days before the first quote (local-time sales on 2023-12-31) take the first one.
-CREATE OR REPLACE TABLE staging.tipo_cambio
+CREATE OR REPLACE TABLE ${staging}.tipo_cambio
 CLUSTER BY Moneda AS
 WITH Fx AS (
     SELECT
@@ -9,7 +9,7 @@ WITH Fx AS (
         , JSON_VALUE(r.Payload.moneda) AS Moneda
         , SAFE_CAST(JSON_VALUE(r.Payload.unidades_por_usd) AS NUMERIC) AS UnidadesPorUsd
         , SAFE_CAST(JSON_VALUE(r.Payload.factor_usd) AS NUMERIC) AS FactorUsd
-    FROM raw.catalogo_tipo_cambio r
+    FROM ${raw}.catalogo_tipo_cambio r
 )
 , Calendario AS (
     SELECT

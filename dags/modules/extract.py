@@ -27,13 +27,14 @@ def polizas(client: ApiClient, updated_since: str | None = None) -> Iterator[tup
 def siniestros(client: ApiClient, meta: dict) -> Iterator[tuple[int, list[dict]]]:
     """Yields (page, rows) by offset until the reported total; past the end the API returns an empty page.
 
-    Fills meta["total"] with the API's own row count, for the completeness check.
+    Fills meta with the API's own row count at the first and last page, for the completeness check.
     """
     offset = 0
     while True:
         body = client.get("/siniestros", {"offset": offset})
         rows, total = body["data"], body["meta"]["total"]
-        meta["total"] = total
+        meta.setdefault("first_total", total)
+        meta["last_total"] = total
         if not rows:
             return
         yield offset // SINIESTROS_PAGE_SIZE, rows
