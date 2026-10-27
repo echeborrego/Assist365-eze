@@ -1,0 +1,2 @@
+mcp>=1.12,<2
+google-cloud-bigquery==3.27.0
