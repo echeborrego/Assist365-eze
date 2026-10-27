@@ -3,7 +3,7 @@ import json
 import logging
 import math
 import tempfile
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import datetime, timezone
 
 from google.api_core.exceptions import NotFound
@@ -26,6 +26,7 @@ RUNS_SCHEMA = [
     bigquery.SchemaField("FinishedAt", "TIMESTAMP"),
     bigquery.SchemaField("Pages", "INTEGER"),
     bigquery.SchemaField("RowsLoaded", "INTEGER"),
+    bigquery.SchemaField("RowsExpected", "INTEGER"),
     bigquery.SchemaField("ApiCalls", "INTEGER"),
     bigquery.SchemaField("ApiRetries", "INTEGER"),
     bigquery.SchemaField("UpdatedSince", "STRING"),
@@ -33,6 +34,10 @@ RUNS_SCHEMA = [
     bigquery.SchemaField("NonFiniteNulled", "INTEGER"),
     bigquery.SchemaField("Error", "STRING"),
 ]
+
+
+class IncompleteExtractError(Exception):
+    pass
 
 
 def ensure_datasets(bq: bigquery.Client, names: Iterable[str], location: str) -> None:
@@ -55,8 +60,12 @@ def _nullify_non_finite(value, counter: list[int]):
 
 
 def load_pages(bq: bigquery.Client, table_id: str, pages: Iterable[tuple[int, list[dict]]], run_id: str,
-               write_disposition: str, partitioned: bool) -> tuple[int, int, int]:
-    """Spools every page to a gzipped NDJSON file, then loads it in ONE job so a failed run writes nothing."""
+               write_disposition: str, partitioned: bool,
+               expected_rows: Callable[[], int | None] | None = None) -> tuple[int, int, int]:
+    """Spools every page to a gzipped NDJSON file, then loads it in ONE job so a failed run writes nothing.
+
+    expected_rows returns the source's own count; the raw spool (duplicates included) must match it.
+    """
     extracted_at = datetime.now(timezone.utc).isoformat()
     n_pages = n_rows = 0
     nulled = [0]
@@ -73,6 +82,9 @@ def load_pages(bq: bigquery.Client, table_id: str, pages: Iterable[tuple[int, li
                 if n_pages % 100 == 0:
                     log.info("%s: %d pages, %d rows spooled", table_id, n_pages, n_rows)
 
+        expected = expected_rows() if expected_rows else None
+        if expected is not None and n_rows != expected:
+            raise IncompleteExtractError(f"{table_id}: received {n_rows} rows, the API reports {expected}")
         if n_rows == 0:
             log.info("%s: nothing new, skipping load", table_id)
             return n_pages, 0, nulled[0]

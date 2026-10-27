@@ -1,9 +1,6 @@
-import logging
 from collections.abc import Iterator
 
 from pipeline.api_client import ApiClient
-
-log = logging.getLogger(__name__)
 
 SINIESTROS_PAGE_SIZE = 500
 CATALOGOS = ("productos", "agencias", "tipo_cambio")
@@ -27,12 +24,16 @@ def polizas(client: ApiClient, updated_since: str | None = None) -> Iterator[tup
         page += 1
 
 
-def siniestros(client: ApiClient) -> Iterator[tuple[int, list[dict]]]:
-    """Yields (page, rows) by offset until the reported total; past the end the API returns an empty page."""
+def siniestros(client: ApiClient, meta: dict) -> Iterator[tuple[int, list[dict]]]:
+    """Yields (page, rows) by offset until the reported total; past the end the API returns an empty page.
+
+    Fills meta["total"] with the API's own row count, for the completeness check.
+    """
     offset = 0
     while True:
         body = client.get("/siniestros", {"offset": offset})
         rows, total = body["data"], body["meta"]["total"]
+        meta["total"] = total
         if not rows:
             return
         yield offset // SINIESTROS_PAGE_SIZE, rows
@@ -41,9 +42,6 @@ def siniestros(client: ApiClient) -> Iterator[tuple[int, list[dict]]]:
             return
 
 
-def catalogo(client: ApiClient, tipo: str) -> list[dict]:
+def catalogo(client: ApiClient, tipo: str) -> tuple[list[dict], int]:
     body = client.get("/catalogos", {"tipo": tipo})
-    rows, total = body["data"], body["meta"]["total"]
-    if len(rows) != total:
-        log.warning("Catalogo %s returned %d rows but meta.total=%d", tipo, len(rows), total)
-    return rows
+    return body["data"], body["meta"]["total"]

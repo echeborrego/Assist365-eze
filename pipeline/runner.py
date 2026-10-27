@@ -53,13 +53,19 @@ def run_source(settings: Settings, source: str, run_id: str | None = None, full_
             run["Watermark"] = state["max"]
         elif source == "siniestros":
             # No incremental filter in the API: append a full daily snapshot, staging reads the latest one
+            meta = {}
             run["Pages"], run["RowsLoaded"], run["NonFiniteNulled"] = load.load_pages(
-                bq, f"{raw}.siniestros", extract.siniestros(api), run_id, "WRITE_APPEND", partitioned=True)
+                bq, f"{raw}.siniestros", extract.siniestros(api, meta), run_id, "WRITE_APPEND", partitioned=True,
+                expected_rows=lambda: meta.get("total"))
+            run["RowsExpected"] = meta.get("total")
         elif source == "catalogos":
+            run["RowsExpected"] = 0
             for tipo in extract.CATALOGOS:
-                pages = [(0, extract.catalogo(api, tipo))]
+                rows, total = extract.catalogo(api, tipo)
+                run["RowsExpected"] += total
                 n_pages, n_rows, n_nulled = load.load_pages(
-                    bq, f"{raw}.catalogo_{tipo}", pages, run_id, "WRITE_TRUNCATE", partitioned=False)
+                    bq, f"{raw}.catalogo_{tipo}", [(0, rows)], run_id, "WRITE_TRUNCATE", partitioned=False,
+                    expected_rows=lambda total=total: total)
                 run["Pages"] += n_pages
                 run["RowsLoaded"] += n_rows
                 run["NonFiniteNulled"] += n_nulled
@@ -72,6 +78,10 @@ def run_source(settings: Settings, source: str, run_id: str | None = None, full_
     finally:
         run["FinishedAt"] = datetime.now(timezone.utc).isoformat()
         run["ApiCalls"], run["ApiRetries"] = api.calls, api.retries
-        load.log_run(bq, runs_table, run)
+        try:
+            load.log_run(bq, runs_table, run)
+        except Exception:
+            # Never let the audit write mask the extraction's own error
+            log.exception("Could not write run log for %s %s", run_id, source)
         log.info("Run %s %s: %s", run_id, source, {k: v for k, v in run.items() if k != "RunId"})
     return run

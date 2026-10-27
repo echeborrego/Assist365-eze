@@ -2,7 +2,6 @@
 -- Data-quality flags are kept on the row; dwh decides what counts (see docs/DECISIONS.md).
 DECLARE UltimoRun STRING;
 DECLARE UltimoExtract TIMESTAMP;
-DECLARE Hoy DATE DEFAULT CURRENT_DATE("America/Argentina/Buenos_Aires");
 
 SET (UltimoRun, UltimoExtract) = (
     SELECT AS STRUCT
@@ -14,6 +13,31 @@ SET (UltimoRun, UltimoExtract) = (
     ORDER BY StartedAt DESC
     LIMIT 1
 );
+
+IF UltimoRun IS NULL THEN
+    RAISE USING MESSAGE = "No successful siniestros extract in raw.extract_runs";
+END IF;
+
+-- The API has no creation date, so the first snapshot a claim appears in stands in for it.
+-- Kept forever: a claim dated after the day we first saw it stays flagged as future-dated (D8).
+CREATE TABLE IF NOT EXISTS staging.siniestros_primera_vez (
+    SiniestroId STRING NOT NULL
+    , PrimeraVezAt TIMESTAMP NOT NULL
+    , PrimeraVezRunId STRING NOT NULL
+);
+
+MERGE staging.siniestros_primera_vez t
+USING (
+    SELECT DISTINCT
+        JSON_VALUE(r.Payload.claim_id) AS SiniestroId
+    FROM raw.siniestros r
+    WHERE r.ExtractedAt >= UltimoExtract
+        AND r.RunId = UltimoRun
+) s
+ON t.SiniestroId = s.SiniestroId
+WHEN NOT MATCHED THEN
+    INSERT (SiniestroId, PrimeraVezAt, PrimeraVezRunId)
+    VALUES (s.SiniestroId, UltimoExtract, UltimoRun);
 
 CREATE OR REPLACE TABLE staging.siniestros
 CLUSTER BY PolizaId AS
@@ -57,11 +81,13 @@ SELECT
     , s.DetalleOrigen
     , s.MontoOrigen < 0 AS EsMontoNegativoOrigen
     , s.MonedaOrigen IS NULL AS EsMonedaInferida
-    , s.FechaOcurrencia > Hoy AS EsFechaFutura
+    , DATE(pv.PrimeraVezAt, "America/Argentina/Buenos_Aires") AS FechaPrimeraVez
+    , s.FechaOcurrencia > DATE(pv.PrimeraVezAt, "America/Argentina/Buenos_Aires") AS EsFechaFutura
     , p.PolizaId IS NULL AS EsPolizaInexistente
     , IFNULL(p.IsDeleted, FALSE) AS EsPolizaEliminada
     , IFNULL(p.Estado = "ANULADA", FALSE) AS EsPolizaAnulada
     , s.FechaOcurrencia NOT BETWEEN p.InicioVigencia AND p.FinVigencia AS EsFueraDeVigencia
     , s.FechaReporte < s.FechaOcurrencia AS EsReporteAntesDeOcurrencia
 FROM Snapshot s
+JOIN staging.siniestros_primera_vez pv ON pv.SiniestroId = s.SiniestroId
 LEFT JOIN staging.polizas p ON p.PolizaId = s.PolizaId
