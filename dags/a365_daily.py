@@ -14,6 +14,7 @@ from modules.transform import run_models, run_tests
     schedule="0 5 * * *",
     start_date=pendulum.datetime(2026, 10, 27, tz="America/Argentina/Buenos_Aires"),
     catchup=False,
+    max_active_runs=1,
     default_args={"retries": 2, "retry_delay": timedelta(minutes=5)},
     tags=["assist365"],
 )

@@ -1,5 +1,7 @@
 -- Grain: one row per poliza_id, its latest state in the CDC stream (deletes kept with IsDeleted).
 -- Incremental: only raw partitions loaded since the last run are read and merged in.
+-- Reads one day back from the watermark: a slower run can commit rows stamped before it (ExtractedAt is
+-- set when spooling starts), and the MERGE only applies newer changes, so reprocessing is harmless.
 -- Rebuild: drop ${staging}.polizas; an empty table reprocesses all of raw.
 DECLARE Desde TIMESTAMP;
 DECLARE Hasta TIMESTAMP;
@@ -36,7 +38,7 @@ SET Desde = IF(
     , TIMESTAMP "1970-01-01"
     , (SELECT MAX(ProcesadoHasta) FROM ${staging}.watermarks WHERE Modelo = "polizas")
 );
-SET Desde = IFNULL(Desde, TIMESTAMP "1970-01-01");
+SET Desde = TIMESTAMP_SUB(IFNULL(Desde, TIMESTAMP "1970-01-02"), INTERVAL 1 DAY);
 SET Hasta = (SELECT MAX(r.ExtractedAt) FROM ${raw}.polizas r WHERE r.ExtractedAt > Desde);
 
 IF Hasta IS NOT NULL THEN
